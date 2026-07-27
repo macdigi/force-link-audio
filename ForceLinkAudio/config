@@ -1,0 +1,10 @@
+# ForceLinkAudio settings — edit on a computer, then reboot the Force.
+
+# Name other apps see for this device in their Link Audio source list.
+PEER="Akai Force"
+
+# Name of the published audio channel.
+CHANNEL="Force Main"
+
+# Localhost port the tap streams to. Change only if 9000 is taken.
+PORT=9000
