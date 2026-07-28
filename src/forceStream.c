@@ -21,8 +21,12 @@
  * SAFETY CONTRACT
  *   - Never breaks audio: on ANY failure the call passes straight through to
  *     the real libasound function.
- *   - Audio-thread path does a bounds check and a memcpy. No locks, no
- *     allocation, no syscalls, no logging.
+ *   - Audio-thread path does a bounds check and a memcpy. No allocation, no
+ *     syscalls, no file I/O, no logging. Config reading, socket setup and
+ *     thread creation all happen in a library constructor at load time; the
+ *     only lock on the hot path is a pthread_once whose fast path is a relaxed
+ *     load. When the tap claims a handle it raises a flag and the sender thread
+ *     writes the log line.
  *   - Ring overflow drops data and bumps a counter. It never blocks MPC.
  *   - Disabled by default: with no config file present this is a no-op tap
  *     that only writes a one-line log so you can confirm it loaded.
@@ -98,12 +102,20 @@ static struct { void *pcm; unsigned frame_bytes, channels, rate; int format;
     g_pcms[MAX_PCMS];
 static volatile void *g_tap_pcm = NULL;   /* the one handle we copy from */
 
-/* SPSC ring: audio thread writes head, sender thread reads tail. */
-static unsigned char    g_ring[RING_BYTES];
-static volatile uint32_t g_head = 0;
-static volatile uint32_t g_tail = 0;
+/* SPSC ring: audio thread writes head, sender thread reads tail.
+ * head/tail are accessed with explicit release/acquire rather than plain
+ * `volatile`. This is a weakly-ordered quad-core ARMv7 (RK3288): volatile stops
+ * the COMPILER reordering but not the CPU, so without a release the sender can
+ * observe a new head before the audio bytes it publishes have landed. The
+ * window is small enough that it has never been heard, but a barrier costs one
+ * dmb per ~128-frame buffer, which is free at this rate — cheaper than relying
+ * on a timing argument. */
+static unsigned char g_ring[RING_BYTES];
+static uint32_t g_head = 0;
+static uint32_t g_tail = 0;
 static volatile uint64_t g_frames_seen = 0;
 static volatile uint64_t g_drops = 0;
+static volatile int g_announce_claim = 0;   /* set on RT thread, logged by sender */
 
 static void fs_log(const char *fmt, ...)
 {
@@ -146,7 +158,14 @@ static void *sender_main(void *unused)
     uint32_t seq = 0;
     unsigned idle_ticks = 0;
     for (;;) {
-        uint32_t head = g_head, tail = g_tail;
+        if (g_announce_claim) {
+            g_announce_claim = 0;
+            fs_log("[forceStream] tapping: %u Hz, %u ch, fmt %d (%u B/frame)",
+                   g_rate, g_channels, g_format, g_frame_bytes);
+        }
+        /* ACQUIRE: pairs with the tap's release so the bytes are visible. */
+        uint32_t head = __atomic_load_n(&g_head, __ATOMIC_ACQUIRE);
+        uint32_t tail = g_tail;                 /* we are the only writer of tail */
         uint32_t avail = (head - tail) & (RING_BYTES - 1);
         unsigned fb = g_frame_bytes ? g_frame_bytes : 8;
         uint32_t chunk = PKT_FRAMES_MAX * fb;
@@ -186,7 +205,9 @@ static void *sender_main(void *unused)
         memcpy(pkt + sizeof(*h), g_ring + tail, first);
         if (avail > first)
             memcpy(pkt + sizeof(*h) + first, g_ring, avail - first);
-        g_tail = (tail + avail) & (RING_BYTES - 1);
+        /* RELEASE: the copies out must complete before the space is freed. */
+        __atomic_store_n(&g_tail, (tail + avail) & (RING_BYTES - 1),
+                         __ATOMIC_RELEASE);
 
         if (g_sock >= 0)
             sendto(g_sock, pkt, sizeof(*h) + avail, 0,
@@ -196,7 +217,15 @@ static void *sender_main(void *unused)
 }
 
 /* ---- init --------------------------------------------------------------- */
-static void fs_init(void)
+/* Split deliberately. fs_setup() touches the filesystem, allocates a socket and
+ * spawns a thread — none of which may happen on MPC's audio thread, so it runs
+ * from a library constructor at load time. fs_resolve() is only dlsym and is
+ * kept lazy, because at constructor time libasound may not be mapped yet; it
+ * never logs. Doing all of this from the first snd_pcm_writei (as this file
+ * used to) meant an fopen and a pthread_create on the RT thread at the instant
+ * the first note played — a xrun-shaped hole in the audio, and a plain
+ * violation of the SAFETY CONTRACT at the top of this file. */
+static void fs_resolve(void)
 {
     orig_writei    = dlsym(RTLD_NEXT, "snd_pcm_writei");
     orig_writen    = dlsym(RTLD_NEXT, "snd_pcm_writen");
@@ -205,9 +234,11 @@ static void fs_init(void)
     q_get_channels = dlsym(RTLD_NEXT, "snd_pcm_hw_params_get_channels");
     q_get_rate     = dlsym(RTLD_NEXT, "snd_pcm_hw_params_get_rate");
     q_pcm_name     = dlsym(RTLD_NEXT, "snd_pcm_name");
+}
 
-    fs_log("[forceStream] loaded into pid %d (writei=%p hw_params=%p)",
-           (int)getpid(), (void *)orig_writei, (void *)orig_hw_params);
+static void fs_setup(void)
+{
+    fs_log("[forceStream] loaded into pid %d", (int)getpid());
 
     /* Streaming is opt-in: no config file, no socket, no thread. */
     int fd = open(CFG_PATH, O_RDONLY);
@@ -250,21 +281,31 @@ static void fs_init(void)
     pthread_attr_destroy(&attr);
 }
 
-static inline void ensure_init(void) { pthread_once(&g_once, fs_init); }
+/* Runs at library load, on whatever thread the loader uses — never the audio
+ * thread. This is the only place that opens files or creates threads. */
+__attribute__((constructor))
+static void fs_ctor(void) { fs_setup(); }
+
+/* Audio-thread safe: one pthread_once and, on the very first call only, dlsym.
+ * No file I/O, no allocation, no logging. */
+static inline void ensure_init(void) { pthread_once(&g_once, fs_resolve); }
 
 /* ---- the audio-thread hot path ------------------------------------------ */
 static inline void tap(const void *src, size_t bytes)
 {
     if (!g_stream_on || !bytes) return;
-    uint32_t head = g_head;
-    uint32_t space = (RING_BYTES - 1) - ((head - g_tail) & (RING_BYTES - 1));
+    uint32_t head = g_head;                                  /* we are the only writer */
+    uint32_t tail = __atomic_load_n(&g_tail, __ATOMIC_ACQUIRE);
+    uint32_t space = (RING_BYTES - 1) - ((head - tail) & (RING_BYTES - 1));
     if (bytes > space) { g_drops++; return; }      /* never block the engine */
     uint32_t first = RING_BYTES - head;
     if (first > bytes) first = bytes;
     memcpy(g_ring + head, src, first);
     if (bytes > first)
         memcpy(g_ring, (const unsigned char *)src + first, bytes - first);
-    g_head = (head + (uint32_t)bytes) & (RING_BYTES - 1);
+    /* RELEASE: the copies above must be visible before the new head is. */
+    __atomic_store_n(&g_head, (head + (uint32_t)bytes) & (RING_BYTES - 1),
+                     __ATOMIC_RELEASE);
 }
 
 /* ---- interposed symbols ------------------------------------------------- */
@@ -294,7 +335,9 @@ int snd_pcm_hw_params(snd_pcm_t *pcm, snd_pcm_hw_params_t *params)
             }
             /* A reconfigure of the handle we are tapping invalidates whatever is
              * still in the ring — it was captured at the old frame size. */
-            if ((void *)pcm == g_tap_pcm) { g_tail = g_head; }
+            if ((void *)pcm == g_tap_pcm)
+                __atomic_store_n(&g_tail, __atomic_load_n(&g_head, __ATOMIC_ACQUIRE),
+                                 __ATOMIC_RELEASE);
             fs_log("[forceStream] configured %s: %u Hz, %u ch, fmt %d (%u B/frame)%s",
                    (q_pcm_name && pcm) ? q_pcm_name(pcm) : "?",
                    rate, ch, fmt, ch * width_of(fmt),
@@ -345,13 +388,6 @@ snd_pcm_sframes_t snd_pcm_writei(snd_pcm_t *pcm, const void *buffer,
         }
 
         if (!g_tap_pcm) {
-            /* Claim only a stream that actually carries SIGNAL. MPC keeps a
-             * silent 4-channel handle open alongside the 2-channel one that has
-             * the music; claiming by "first to write" grabbed the silent one,
-             * and tapping both interleaved silence into the audio — which is
-             * what the grain was. Scan until a non-zero byte shows up. */
-            const unsigned char *pb = (const unsigned char *)buffer;
-            size_t nb = (size_t)r * g_pcms[slot].frame_bytes, k;
             /* MEASURED 2026-07-27: MPC opens two handles on hw:1 but only ONE
              * ever writes (4ch handle: 1.8M frames; 2ch handle: 0 frames). So
              * there is no "pick the right stream" problem — claim the first
@@ -365,9 +401,9 @@ snd_pcm_sframes_t snd_pcm_writei(snd_pcm_t *pcm, const void *buffer,
             g_rate = g_pcms[slot].rate;
             g_format = g_pcms[slot].format;
             g_frame_bytes = g_pcms[slot].frame_bytes;
-            fs_log("[forceStream] tapping %s: %u Hz, %u ch, fmt %d (%u B/frame)",
-                   (q_pcm_name && pcm) ? q_pcm_name(pcm) : "?",
-                   g_rate, g_channels, g_format, g_frame_bytes);
+            /* Do NOT log here — this is the audio thread. Raise a flag and let
+             * the sender thread, which wakes every 2 ms anyway, write the line. */
+            g_announce_claim = 1;
         }
         if ((void *)pcm != g_tap_pcm) return r; /* a second stream — ignore it */
 

@@ -1,0 +1,9 @@
+ForceLinkAudio 1.0.1
+target: arm-linux-gnueabihf.2.39 (armv7l, glibc 2.39), built with zig
+
+source sha256:
+  901f6f9df5c2aa4e80f075109d14ecf4b1a1bbb04a2de29952e17288d9d16d71  src/forceStream.c
+  608b921efee1f0992451ea5fab141dca1a2e6aa76cff587db174e34c97927115  src/forceLinkAudio.cpp
+binary sha256:
+  df3f858b84372c1f3a4ed0a75cf3ae054a3ee584c21b3dfebab39401fb245a2c  ForceLinkAudio/forceStream.so
+  efa271400e1857394880c05302e476d52467d91d33d65362bc7900f8cedeebd3  ForceLinkAudio/forceLinkAudio

@@ -93,9 +93,25 @@ disable, and the Force is stock again.
 
 - **Stereo main mix only.** The Force presents a 4-channel device to ALSA but
   channels 3/4 are silent, so there are no per-track stems available this way.
-- **Latency is the receiver's,** not this addon's. Link Audio receivers buffer
-  to stay beat-aligned and some buffer generously. Measured transparent through
-  Ableton Live's receiver against the Force's own headphone output.
+- **Latency is almost entirely the receiver's.** This addon's own contribution
+  is about 20 ms, measured — a few milliseconds of ring plus one commit block.
+  What you actually feel is your receiver's jitter buffer. Link Audio receivers
+  buffer to stay beat-aligned, and if a receiver expresses that buffer as a
+  number of *beats* rather than milliseconds, its latency will scale with your
+  session tempo: the same receiver can be under two seconds at 130 BPM and over
+  three at 75. If the delay feels wrong, check the receiver before suspecting
+  the network.
+- **The daemon listens on 127.0.0.1 only.** The tap never sends anywhere else,
+  so there is nothing to reach from another machine — deliberately, since a
+  wildcard bind would let anyone on the same network publish audio as your
+  instrument.
+- **Clock drift is tolerated, not corrected.** The Force's 44.1 kHz crystal is
+  not your receiver's clock — measured here at about 116 ppm apart, or roughly
+  a beat every few hours. Rather than resample or splice samples continuously
+  to hide that, the bridge lets it accumulate and resynchronises once when it
+  passes two beats. On a normal session you will never reach it. Correcting it
+  properly needs a real resampler, which is not worth the artifacts it would
+  trade for.
 - Tested on MockbaMod, Force firmware 3.x, kernel 6.6.95, armv7l. **Only tested
   on one machine so far** — reports welcome.
 
