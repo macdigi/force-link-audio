@@ -21,3 +21,16 @@ and controls. Final continuous-playback Mac capture: 641,000 stereo frames,
 After release and PR creation, reply to sd88me in OpenMPC #showcase with the
 release and PR links and the actual tested scope. Do not claim catalog acceptance
 before the maintainers merge it. Other MPC hardware remains unverified.
+
+## Submission and review follow-up (October 14, 2026)
+
+Release v1.1.0 is public. Catalog PR:
+https://github.com/sd88me/mpc-vst-plugins/pull/438
+
+The requested network/runs-programs categories are proposed for maintainer
+confirmation. The summary warns to disable the legacy addon. The optional
+2:1 signal-flow image is attached to v1.1.0 without moving its tag or changing
+the tested ZIP. All three packaged shared-installer files were compared byte
+for byte with the intentional e18a0a1 pin and matched. Registry validation
+passed for 119 entries; ZIP validation retained only the two expected warnings.
+The PR body now includes “no docs needed” for the catalog repository.
