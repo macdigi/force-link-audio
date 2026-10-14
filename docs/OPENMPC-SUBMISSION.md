@@ -15,8 +15,8 @@ the separate publisher, with no shell evaluation and no inherited LD_PRELOAD.
 Completed real-device checks: default disabled behavior, enable/startup,
 settings-preserving reinstall, other preloads retained, uninstall, original-addon
 rollback, and reinstall of the new adapter. The owner confirmed local sound and
-controls were normal while playing. The diagnostic Mac receiver's capture
-started after that performance and contained silence. A direct localhost packet
+controls were normal while playing. The diagnostic Mac receiver captured silence; the performance may have ended
+before the capture began. A direct localhost packet
 check also measured silence on all four S32 channels, so non-silent end-to-end
 capture remains pending. Do not claim it passed yet.
 
