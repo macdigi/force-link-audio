@@ -14,11 +14,9 @@ the separate publisher, with no shell evaluation and no inherited LD_PRELOAD.
 
 Completed real-device checks: default disabled behavior, enable/startup,
 settings-preserving reinstall, other preloads retained, uninstall, original-addon
-rollback, and reinstall of the new adapter. The owner confirmed local sound and
-controls were normal while playing. The diagnostic Mac receiver captured silence; the performance may have ended
-before the capture began. A direct localhost packet
-check also measured silence on all four S32 channels, so non-silent end-to-end
-capture remains pending. Do not claim it passed yet.
+rollback, and reinstall of the new adapter. Owner confirmed normal local sound
+and controls. Final continuous-playback Mac capture: 641,000 stereo frames,
+1,281,616 nonzero samples, zero clipped samples. See OPENMPC-VERIFICATION.md.
 
 After release and PR creation, reply to sd88me in OpenMPC #showcase with the
 release and PR links and the actual tested scope. Do not claim catalog acceptance

@@ -1,8 +1,7 @@
 # OpenMPC adapter verification — 2026-10-13
 
-Candidate: 1.1.0. Publication and catalog PR are pending musical playback acceptance.
-Real MPC-process installation and rollback passed on October 14; no audible
-acceptance or other-MPC compatibility claim is made yet.
+Release: 1.1.0. Real Force installation, rollback and musical playback acceptance
+passed on October 14. Other MPC hardware remains unverified.
 
 - Source: Force Link Audio 1.0.1 plus isolated OpenMPC startup/config adapter.
 - Ableton Link: 902aef95bf94af49746fdda5369b42cdcfa1e6d2.
@@ -32,8 +31,11 @@ acceptance or other-MPC compatibility claim is made yet.
   received 1,726,375 frames in the initial 45-second check. Publisher reported
   zero gaps/spills/resyncs during that interval. Peak was only 1 int16 unit:
   this is a transport/silence check, NOT a music or sound-quality acceptance.
-- Pending: project playing with normal local sound and controls, and non-silent
-  receiver capture. Owner prompted to reopen the saved project and play it.
+- Final continuous-playback check: owner confirmed normal local sound and controls.
+  Mac receiver discovered Akai Force / Force Main and captured 641,000 frames in
+  5,128 callbacks: 1,281,616 nonzero samples, peak 14,161/32,767, RMS 2,601.28,
+  zero clipped samples. This verifies non-silent end-to-end transfer; it is not a
+  claim of zero network latency or compatibility with untested MPC models.
 
 ## Network / process review
 

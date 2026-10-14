@@ -20,8 +20,10 @@ its changes and uninstall procedure, including the shared boot-reload integratio
 Source: the matching tag in this repository. GPL-2.0-or-later; third-party notices
 are included. Thanks to sd88me/OpenMPC, MockbaMod contributors and Amit Talwar.
 
-### Candidate verification
+### Verification
 
 Catalog validation, 12 config-parser cases, 77 shared-installer checks and the
-isolated ARM lifecycle test passed. Real MPC installation, settings preservation and rollback also passed. Musical
-playback acceptance is still pending; this draft is not the published release.
+isolated ARM lifecycle test passed. Real Force installation, settings preservation and rollback passed. The owner
+confirmed normal local sound and controls while looping a saved project. A Mac
+Link Audio receiver captured 641,000 non-silent stereo frames with no clipping.
+Other MPC models remain unverified.
