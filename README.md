@@ -52,7 +52,27 @@ function on any error, and drops data rather than ever blocking playback.
 The LD_PRELOAD approach is the one MockbaMod already uses for
 `customBufferSize` by Amit Talwar. Credit to him for the pattern.
 
-## Install
+## OpenMPC add-in package (1.1)
+
+The new package uses OpenMPC's shared add-in installer and catalog format.
+It keeps the original Force Link Audio name, repository, authorship and GPL license.
+See [the add-in installation and migration guide](packaging/README.md).
+Network publication is **off by default**. Do not enable both the old MockbaMod
+addon and this add-in at once. Other MPC hardware is unverified.
+
+Build the add-in from source with Zig (tested with 0.16.0):
+
+```sh
+sh tools/fetch_dependencies.sh
+LINK="$PWD/.deps/link" sh tools/build_addin.sh
+sh tools/package_addin.sh
+```
+
+The dependency script pins public Ableton Link and OpenMPC sources; it does not
+include COMPA or any proprietary application code. The ZIP includes the shared
+installer, checksums, source identity and third-party license notices.
+
+## Legacy MockbaMod installation (1.0.x)
 
 1. Copy the `ForceLinkAudio` folder to `<SD>/AddOns/` on your MockbaMod card.
 2. SSH in and run:

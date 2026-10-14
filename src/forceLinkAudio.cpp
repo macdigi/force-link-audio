@@ -34,6 +34,11 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#ifdef __linux__
+#include <sys/prctl.h>
+#include <signal.h>
+#endif
+
 #include <atomic>
 #include <chrono>
 #include <cmath>
@@ -134,6 +139,15 @@ size_t toInt16(const uint8_t* src, size_t bytes, uint16_t format, int16_t* dst, 
 
 int main(int argc, char** argv)
 {
+#ifdef __linux__
+  // The optional owner PID is used by the OpenMPC package. Stop when MPC exits.
+  // Check after prctl too, to close the race where MPC exits before registration.
+  if (argc > 4) {
+    const auto owner = static_cast<pid_t>(std::atoi(argv[4]));
+    if (owner <= 1 || prctl(PR_SET_PDEATHSIG, SIGTERM) != 0 || getppid() != owner)
+      return 1;
+  }
+#endif
   const int port = (argc > 1) ? std::atoi(argv[1]) : kDefaultPort;
   const std::string peerName = (argc > 2) ? argv[2] : "Akai Force";
   const std::string chanName = (argc > 3) ? argv[3] : "Force Main";

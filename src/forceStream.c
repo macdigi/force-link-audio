@@ -236,10 +236,19 @@ static void fs_resolve(void)
     q_pcm_name     = dlsym(RTLD_NEXT, "snd_pcm_name");
 }
 
+#ifdef FORCE_LINK_OPENMPC
+#include "addin_runtime.h"
+#endif
+
 static void fs_setup(void)
 {
     fs_log("[forceStream] loaded into pid %d", (int)getpid());
 
+#ifdef FORCE_LINK_OPENMPC
+    if (!fl_prepare()) return;
+    int port = fl_cfg.port;
+    char buf[128] = "127.0.0.1";
+#else
     /* Streaming is opt-in: no config file, no socket, no thread. */
     int fd = open(CFG_PATH, O_RDONLY);
     if (fd < 0) {
@@ -257,6 +266,7 @@ static void fs_setup(void)
     int port = atoi(colon + 1);
     char *nl = strchr(buf, '\n'); if (nl) *nl = 0;
 
+#endif
     g_sock = socket(AF_INET, SOCK_DGRAM, 0);
     if (g_sock < 0) { fs_log("[forceStream] socket() failed"); return; }
     memset(&g_dst, 0, sizeof(g_dst));
@@ -267,6 +277,9 @@ static void fs_setup(void)
         close(g_sock); g_sock = -1; return;
     }
 
+#ifdef FORCE_LINK_OPENMPC
+    if (!fl_spawn()) { close(g_sock); g_sock = -1; return; }
+#endif
     pthread_t t;
     pthread_attr_t attr;
     pthread_attr_init(&attr);

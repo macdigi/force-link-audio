@@ -1,0 +1,6 @@
+ADDIN_ID=force-link-audio
+ADDIN_NAME="Force Link Audio"
+ADDIN_SO=forceLinkAudioAddin.so
+ADDIN_CONF=force-link-audio.conf
+ADDIN_FILES="forceLinkAudio LICENSE THIRD-PARTY-NOTICES.txt README-addin.txt"
+ADDIN_DONE="Network audio is off by default. Read README-addin.txt, then set enabled=1 in force-link-audio.conf and restart MPC after saving your project."
