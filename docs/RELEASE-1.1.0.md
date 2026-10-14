@@ -23,5 +23,5 @@ are included. Thanks to sd88me/OpenMPC, MockbaMod contributors and Amit Talwar.
 ### Candidate verification
 
 Catalog validation, 12 config-parser cases, 77 shared-installer checks and the
-isolated ARM lifecycle test passed. Real MPC install/audio/rollback acceptance is
-still pending; this draft is not the published release.
+isolated ARM lifecycle test passed. Real MPC installation, settings preservation and rollback also passed. Musical
+playback acceptance is still pending; this draft is not the published release.
